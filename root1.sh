@@ -23,7 +23,7 @@ sudo sed -i 's/^.*PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ss
 
 
 # 重启 SSH 服务
-sudo reboot
+sudo service sshd restart
 
 # 设置曼谷时区
 sudo timedatectl set-timezone Asia/Bangkok
