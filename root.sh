@@ -23,6 +23,8 @@ sudo sed -i 's/^.*PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ss
 
 
 # 重启 SSH 服务
+sudo service sshd restart
+
 sudo systemctl restart sshd
 
 # 设置曼谷时区
