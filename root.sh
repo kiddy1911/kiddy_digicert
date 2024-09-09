@@ -20,6 +20,8 @@ echo 'PermitRootLogin yes' | sudo tee -a /etc/ssh/sshd_config
 # 启用密码认证
 sudo sed -i 's/^.*PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
 
+# 去掉注释的 Include 行
+sudo sed -i 's/^Include/#Include/' /etc/ssh/sshd_config
 
 
 # 重启 SSH 服务
