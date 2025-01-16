@@ -32,13 +32,19 @@ sed -i 's/^Include/#Include/' /etc/ssh/sshd_config
 
 # 重启 SSH 服务
 
+setenforce 0
+
+
 service sshd restart
+
+
+sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+
+
 
 systemctl restart sshd
 
-setenforce 0
 
-sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
 
 
 # 设置曼谷时区
