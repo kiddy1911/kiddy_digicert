@@ -53,8 +53,7 @@ for (var line of lines) {
         node += ', obfs-host=' + sni;
         if (pbk) node += ', reality-base64-pubkey=' + pbk;
         if (sid) node += ', reality-hex-shortid=' + sid;
-        // ✅ 只在 URI 明确包含 flow 参数时才加
-        if (params['flow']) node += ', vless-flow=' + params['flow'];
+        // ✅ vless-flow 整行删除，不输出
         node += ', tag=' + name;
 
         parsed.push(node);
