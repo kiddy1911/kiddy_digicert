@@ -2009,84 +2009,165 @@ function SSR2QX(subs, Pudp, Ptfo) {
 //;vless=example.com:443, method=none, password=23ad6b10-8d1a-40f7-8ad0-e3e35cd32291, obfs=wss, obfs-uri=/ws, fast-open=false, udp-relay=false, tag=vless-ws-tls-01
 //vless://YXV0bzpkampkakAxLjEuMS4xOjY2NjY?remarks=vless&obfsParam=hshdh&path=/jsjdj&obfs=http&tls=1&peer=abc.com&tfo=1
 //vls = VLESS,1.1.1.1,443,"b0dd64e4-0fbd-4038-9139-d1f32a68a0dc",transport=ws,path=patha,host=host.com,udp=true,over-tls=true,tls-name=sni.co
+// Vless uri 转换成 QUANX 格式 (已融入自制 Reality+IPv6 解析增强逻辑)
 function VL2QX(subs, Pudp, Ptfo, Pcert0, PTls13) {
-  var nvless = []
-  var cnt = subs.split("vless://")[1]
-  type = "vless=";
-  mtd= "method=none"
-  obfs=""
-  thost=""
-  if((cnt.indexOf("remarks=")==-1 && cnt.indexOf("remark=")==-1) && cnt.indexOf("@")!=-1) { // normal URI
-  typeU = "URI"
-  ip = cnt.split("@")[1].split("encry")[0].split("?")[0];
-  pwd = cnt.split("@")[0]? "password=" + cnt.split("@")[0]:"";
-  pcert = cnt.indexOf("allowInsecure=0") != -1 ? "tls-verification=true" : "tls-verification=false";
-  thost = cnt.indexOf("sni=") != -1? "tls-host="+cnt.split("sni=")[1].split(/&|#/)[0]:""
-  thost = cnt.indexOf("peer=") != -1? "tls-host="+cnt.split("peer=")[1].split(/&|#/)[0]:thost
-  tag = cnt.indexOf("#") != -1 ? "tag=" + decodeURIComponent(cnt.split("#").slice(-1)[0]) : "tag= [vless]" + ip
-  } else { // shadowrocket style
-    typeU = "SR-URI"
-    b64part = Base64.decode(cnt.split("?")[0])
-    ip = b64part.split("@")[1]
-    pwd = "password=" + b64part.split("@")[0].split(":")[1]
-    tag = cnt.indexOf("remarks=") != -1 ? "tag=" + decodeURIComponent(cnt.split("remarks=")[1].split("&")[0]) : "tag= [vless]" + ip
-    tag = cnt.indexOf("remark=") != -1 ? "tag=" + decodeURIComponent(cnt.split("remark=")[1].split("&")[0]) : tag
-  }
- 
-  puri = ""
- 
-  pudp = (Pudp == 1 || cnt.indexOf("udp=1")!=-1) ? "udp-relay=true" : "udp-relay=false";
-  ptfo = (Ptfo == 1 || cnt.indexOf("tfo=1")!=-1)? "fast-open=true" : "fast-open=false";
-  //ptfo = cnt.indexOf("tfo=1") != -1? "fast-open=true" : ptfo
-  if (typeU == "SR-URI") {//小火箭内的websocket写法
-    if((cnt.indexOf("obfs=none")!=-1 || cnt.indexOf("obfs=")==-1) && cnt.indexOf("tls=1")==-1) {
-      // tcp
-      obfs = ""
-    } else if((cnt.indexOf("obfs=none")!=-1 || cnt.indexOf("obfs=")==-1) && cnt.indexOf("tls=1")!=-1) {
-      obfs = "obfs=over-tls"
-    } else if(cnt.indexOf("obfs=http")!=-1) {
-      obfs = "obfs=http"
-    } else if(cnt.indexOf("obfs=websocket")!=-1) {
-      obfs = cnt.indexOf("tls=1") != -1? "obfs=wss" : "obfs=ws"
-    } else { //不支持类型
-      type="NS"
-    }
-  thost=cnt.indexOf("obfsParam=") == -1? thost : "obfs-host=" + decodeURIComponent(cnt.split("obfsParam=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"")
-  thost=cnt.indexOf("sni=") == -1? thost : "obfs-host=" + decodeURIComponent(cnt.split("sni=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"")
-  thost=cnt.indexOf("peer=") == -1? thost : "obfs-host=" + decodeURIComponent(cnt.split("peer=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"")
+  var nvless = [];
+  var cnt = subs.split("vless://")[1];
+  var type = "vless=";
+  var mtd = "method=none";
+  var obfs = "";
+  var thost = "";
+  var puri = "";
+  var pudp = (Pudp == 1 || cnt.indexOf("udp=1")!=-1) ? "udp-relay=true" : "udp-relay=false";
+  var ptfo = (Ptfo == 1 || cnt.indexOf("tfo=1")!=-1) ? "fast-open=true" : "fast-open=false";
+  var pcert = "";
+  var ptls13 = "";
+  var prlt = "";
+  var tag = "";
+  var ip = "";
+  var pwd = "";
 
-  puri = cnt.indexOf("path=") == -1? puri : "obfs-uri=" + decodeURIComponent(cnt.split("path=")[1].split("&")[0].split("#")[0])
-  } else if (cnt.indexOf("&type=ws")!=-1 || cnt.indexOf("?type=ws")!=-1 || cnt.indexOf("type=http")!=-1 || cnt.indexOf("security=tls")!=-1 || cnt.indexOf("security=reality")!=-1) {//v2rayN uri
-    if(cnt.indexOf("type=http") != -1) {
-      obfs="obfs=http"
-    } else if (cnt.indexOf("type=ws") != -1) {
-      obfs = cnt.indexOf("security=tls") != -1 || cnt.indexOf("security=reality")!=-1? "obfs=wss" : "obfs=ws" 
-    } else if(cnt.indexOf("type=")==-1 || cnt.indexOf("type=tcp")!=-1) {
-      obfs = "obfs=over-tls"
-    } else if(cnt.indexOf("type=")!=-1 && cnt.indexOf("type=tcp")==-1) {//暂不支持类型
-    type="NS"
-  }
-    thost=cnt.indexOf("&host=") == -1? thost : "obfs-host=" + decodeURIComponent(cnt.split("&host=")[1].split("&")[0].split("#")[0])
-    thost=cnt.indexOf("sni=") == -1? thost : "obfs-host=" + decodeURIComponent(cnt.split("sni=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"")
-    puri = cnt.indexOf("&path=") == -1? puri : "obfs-uri=" + decodeURIComponent(cnt.split("&path=")[1].split("&")[0].split("#")[0])
+  // 1. 采用你提供的标准 VLESS URI 解析逻辑 (原生支持 Reality, IPv6 及标准 URL 参数)
+  if (cnt.indexOf("@") !== -1 && cnt.indexOf("?") !== -1 && cnt.indexOf("remarks=") === -1 && cnt.indexOf("remark=") === -1) {
+      var hashIdx = cnt.lastIndexOf('#');
+      var name = hashIdx !== -1 ? decodeURIComponent(cnt.slice(hashIdx + 1)) : '';
+      var mainPart = hashIdx !== -1 ? cnt.slice(0, hashIdx) : cnt;
+      var atIdx = mainPart.indexOf('@');
+      var uuid = mainPart.slice(0, atIdx);
+      var rest = mainPart.slice(atIdx + 1);
+      var qIdx = rest.indexOf('?');
+      var hostPort = qIdx !== -1 ? rest.slice(0, qIdx) : rest;
+      var paramStr = qIdx !== -1 ? rest.slice(qIdx + 1) : '';
+
+      // 解析 host:port（完美支持 IPv6）
+      var host, port;
+      if (hostPort.startsWith('[')) {
+          var bracketEnd = hostPort.indexOf(']');
+          host = hostPort.slice(1, bracketEnd);
+          port = hostPort.slice(bracketEnd + 2);
+      } else {
+          var colonIdx = hostPort.lastIndexOf(':');
+          host = hostPort.slice(0, colonIdx);
+          port = hostPort.slice(colonIdx + 1);
+      }
+      ip = host + ":" + port;
+      pwd = "password=" + uuid;
+      tag = name ? "tag=" + name : "tag= [vless]" + ip;
+
+      // 解析 URI 参数
+      var params = {};
+      paramStr.split('&').forEach(function(p) {
+          var eqIdx = p.indexOf('=');
+          if (eqIdx !== -1) params[p.slice(0, eqIdx)] = decodeURIComponent(p.slice(eqIdx + 1));
+      });
+
+      // 提取参数
+      var sni = params['sni'] || params['peer'] || params['host'] || host;
+      thost = sni ? "obfs-host=" + sni : "";
+      var net = params['type'] || 'tcp';
+      var security = params['security'] || '';
+      puri = params['path'] ? "obfs-uri=" + params['path'] : "";
+
+      // 根据安全类型和传输协议处理 obfs 和 reality 参数
+      if (security === 'reality') {
+          obfs = "obfs=over-tls"; // Reality 在圈X中借用 over-tls 通道
+          var pbk = params['pbk'] || '';
+          var sid = params['sid'] || '';
+          var flow = params['flow'] || 'xtls-rprx-vision';
+          
+          var rltArr = [];
+          if (pbk) rltArr.push("reality-base64-pubkey=" + pbk);
+          if (sid) rltArr.push("reality-hex-shortid=" + sid);
+          if (flow) rltArr.push("vless-flow=" + flow);
+          prlt = rltArr.join(", ");
+      } else if (net === 'ws') {
+          obfs = (security === 'tls') ? "obfs=wss" : "obfs=ws";
+      } else if (net === 'http') {
+          obfs = "obfs=http";
+      } else if (security === 'tls') {
+          obfs = "obfs=over-tls";
+      }
+
+      // 处理 tls 证书验证 (支持脚本内传入的参数 Pcert0)
+      if (security === 'tls' || security === 'reality') {
+          if (Pcert0 == 0 || params['allowInsecure'] === '1') {
+              pcert = "tls-verification=false";
+          } else if (Pcert0 == 1) {
+              pcert = "tls-verification=true";
+          }
+          ptls13 = PTls13 == 1 ? "tls13=true" : "";
+      }
+
+      // 拼装圈X格式并返回
+      nvless.push(type + ip, pwd, mtd, obfs, pcert, thost, puri, pudp, ptfo, prlt, ptls13, tag);
+      return nvless.filter(Boolean).join(", ");
   } 
-if(obfs=="obfs=wss" && obfs=="obfs=over-tls"){
-  ptls13 = PTls13 == 1 ? "tls13=true" : "tls13=false"
-  if (Pcert0 == 0) { 
-    pcert = "tls-verification=false" 
-  } else if (Pcert0 == 1) {
-    pcert = "tls-verification=true"
+  // 2. 向下兼容原版逻辑 (用于处理小火箭 Shadowrocket 的 Base64 杂交格式)
+  else {
+      var typeU = "SR-URI";
+      if((cnt.indexOf("remarks=")==-1 && cnt.indexOf("remark=")==-1) && cnt.indexOf("@")!=-1) {
+          typeU = "URI";
+          ip = cnt.split("@")[1].split("encry")[0].split("?")[0];
+          pwd = cnt.split("@")[0] ? "password=" + cnt.split("@")[0] : "";
+          pcert = cnt.indexOf("allowInsecure=0") != -1 ? "tls-verification=true" : "tls-verification=false";
+          thost = cnt.indexOf("sni=") != -1 ? "tls-host="+cnt.split("sni=")[1].split(/&|#/)[0] : "";
+          thost = cnt.indexOf("peer=") != -1 ? "tls-host="+cnt.split("peer=")[1].split(/&|#/)[0] : thost;
+          tag = cnt.indexOf("#") != -1 ? "tag=" + decodeURIComponent(cnt.split("#").slice(-1)[0]) : "tag= [vless]" + ip;
+      } else {
+          var b64part = Base64.decode(cnt.split("?")[0]);
+          ip = b64part.split("@")[1];
+          pwd = "password=" + b64part.split("@")[0].split(":")[1];
+          tag = cnt.indexOf("remarks=") != -1 ? "tag=" + decodeURIComponent(cnt.split("remarks=")[1].split("&")[0]) : "tag= [vless]" + ip;
+          tag = cnt.indexOf("remark=") != -1 ? "tag=" + decodeURIComponent(cnt.split("remark=")[1].split("&")[0]) : tag;
+      }
+
+      if (typeU == "SR-URI") {
+          if((cnt.indexOf("obfs=none")!=-1 || cnt.indexOf("obfs=")==-1) && cnt.indexOf("tls=1")==-1) {
+              obfs = "";
+          } else if((cnt.indexOf("obfs=none")!=-1 || cnt.indexOf("obfs=")==-1) && cnt.indexOf("tls=1")!=-1) {
+              obfs = "obfs=over-tls";
+          } else if(cnt.indexOf("obfs=http")!=-1) {
+              obfs = "obfs=http";
+          } else if(cnt.indexOf("obfs=websocket")!=-1) {
+              obfs = cnt.indexOf("tls=1") != -1 ? "obfs=wss" : "obfs=ws";
+          } else { 
+              type="NS";
+          }
+          thost = cnt.indexOf("obfsParam=") == -1 ? thost : "obfs-host=" + decodeURIComponent(cnt.split("obfsParam=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"");
+          thost = cnt.indexOf("sni=") == -1 ? thost : "obfs-host=" + decodeURIComponent(cnt.split("sni=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"");
+          thost = cnt.indexOf("peer=") == -1 ? thost : "obfs-host=" + decodeURIComponent(cnt.split("peer=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"");
+          puri = cnt.indexOf("path=") == -1 ? puri : "obfs-uri=" + decodeURIComponent(cnt.split("path=")[1].split("&")[0].split("#")[0]);
+      } else if (cnt.indexOf("&type=ws")!=-1 || cnt.indexOf("?type=ws")!=-1 || cnt.indexOf("type=http")!=-1 || cnt.indexOf("security=tls")!=-1 || cnt.indexOf("security=reality")!=-1) {
+          if(cnt.indexOf("type=http") != -1) {
+              obfs = "obfs=http";
+          } else if (cnt.indexOf("type=ws") != -1) {
+              obfs = cnt.indexOf("security=tls") != -1 || cnt.indexOf("security=reality")!=-1 ? "obfs=wss" : "obfs=ws";
+          } else if(cnt.indexOf("type=")==-1 || cnt.indexOf("type=tcp")!=-1) {
+              obfs = "obfs=over-tls";
+          } else if(cnt.indexOf("type=")!=-1 && cnt.indexOf("type=tcp")==-1) {
+              type = "NS";
+          }
+          thost = cnt.indexOf("&host=") == -1 ? thost : "obfs-host=" + decodeURIComponent(cnt.split("&host=")[1].split("&")[0].split("#")[0]);
+          thost = cnt.indexOf("sni=") == -1 ? thost : "obfs-host=" + decodeURIComponent(cnt.split("sni=")[1].split("&")[0].split("#")[0]).replace(/\"|(Host\":)|\{|\}/g,"");
+          puri = cnt.indexOf("&path=") == -1 ? puri : "obfs-uri=" + decodeURIComponent(cnt.split("&path=")[1].split("&")[0].split("#")[0]);
+      } 
+
+      if(obfs=="obfs=wss" || obfs=="obfs=over-tls"){
+          ptls13 = PTls13 == 1 ? "tls13=true" : "tls13=false";
+          if (Pcert0 == 0) pcert = "tls-verification=false";
+          else if (Pcert0 == 1) pcert = "tls-verification=true";
+      } else {
+          pcert = "";
+          ptls13 = "";
+      }
+
+      prlt = version >= 891 ? Reality_Handle(cnt) : "";
+      nvless.push(type + ip, pwd, mtd, obfs, pcert, thost, puri, pudp, ptfo, prlt, tag);
+      
+      var QX = type != "NS" ? nvless.filter(Boolean).join(", ") : "";
+      if (type == "NS") PNS = PNS + 1;
+      return QX;
   }
-} else {
-  pcert=""
-  ptls13=""
-}
-// Reality para 2025-12-30
-  prlt= version>=891? Reality_Handle(cnt) : ""
-  nvless.push(type + ip, pwd, mtd, obfs, pcert, thost, puri, pudp, ptfo, prlt, tag)
-  QX = type!="NS"? nvless.filter(Boolean).join(", ")  : ""
-  PNS= type=="NS"? PNS+1 : PNS
-  return QX
 }
 
 //Trojan 类型 URI 转换成 QX, 包含小火箭类型
